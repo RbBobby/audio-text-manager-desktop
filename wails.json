@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "AudioTextManager",
+  "outputfilename": "AudioTextManager",
+  "frontend:dir": "frontend/dist",
+  "frontend:install": "",
+  "frontend:build": "",
+  "wailsjsdir": "./frontend",
+  "author": {
+    "name": "Audio Text Manager"
+  },
+  "info": {
+    "companyName": "Audio Text Manager",
+    "productName": "Audio Text Manager",
+    "productVersion": "0.1.0",
+    "copyright": "",
+    "comments": "Self-contained desktop transcription and summaries via whisper.cpp and llama.cpp"
+  }
+}

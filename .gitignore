@@ -1,0 +1,45 @@
+# Production / local builds — do not commit
+/dist/
+/build/bin/
+*.app
+*.app/
+AudioTextManager.zip
+build/bin/AudioTextManager.zip
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+atm-desktop
+
+# Wails compile leftovers
+build/darwin/*.app
+build/windows/
+
+# Go
+vendor/
+*.test
+*.out
+coverage.html
+
+# Frontend toolchain (UI sources live in frontend/dist)
+frontend/node_modules/
+frontend/wailsjs/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+*.log
+
+# Accidental dumps
+/дщ
+
+# Sidecar + models (make fetch-runtime / make dist)
+/models/
+third_party/ffmpeg/
+third_party/whisper/
+third_party/llama/
+third_party/models/
+third_party/src/
