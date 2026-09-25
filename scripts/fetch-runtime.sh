@@ -80,7 +80,20 @@ fetch_ffmpeg() {
     return
   fi
   if [[ "$OS" == "mingw"* || "$OS" == "msys"* || "$OS" == "cygwin"* || "$OS" == "windows"* ]]; then
-    echo "On Windows download ffmpeg essentials into third_party/ffmpeg (ffmpeg.exe, ffprobe.exe)"
+    download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" "$TP/src/ffmpeg-win.zip"
+    rm -rf "$TP/src/ffmpeg-win"
+    mkdir -p "$TP/src/ffmpeg-win"
+    unzip -o "$TP/src/ffmpeg-win.zip" -d "$TP/src/ffmpeg-win"
+    local ff
+    ff="$(find "$TP/src/ffmpeg-win" -type f -name ffmpeg.exe | head -n1)"
+    local fp
+    fp="$(find "$TP/src/ffmpeg-win" -type f -name ffprobe.exe | head -n1)"
+    if [[ -z "$ff" || -z "$fp" ]]; then
+      echo "ffmpeg.exe / ffprobe.exe not found in essentials zip" >&2
+      exit 1
+    fi
+    cp "$ff" "$TP/ffmpeg/ffmpeg.exe"
+    cp "$fp" "$TP/ffmpeg/ffprobe.exe"
     return
   fi
   echo "unsupported OS for ffmpeg auto-fetch: $OS"
@@ -157,6 +170,7 @@ fetch_whisper() {
 fetch_models() {
   download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin" "$TP/models/ggml-small-q5_1.bin"
   download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin" "$TP/models/ggml-medium-q5_0.bin"
+  download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin" "$TP/models/ggml-large-v3-q5_0.bin"
   download "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf" \
     "$TP/models/qwen2.5-3b-instruct-q4_k_m.gguf"
 }

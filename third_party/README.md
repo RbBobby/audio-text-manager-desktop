@@ -1,11 +1,14 @@
 # Sidecar binaries (not committed)
 
-`make fetch-runtime` fills this tree; `make dist` copies it into the built app.
+`make fetch-runtime` fills this tree. Packaging copies a **subset** of Whisper weights:
+
+- `medium` build: `ggml-small-q5_1.bin` + `ggml-medium-q5_0.bin`
+- `speakers` build: `ggml-small-q5_1.bin` + `ggml-large-v3-q5_0.bin` (+ `flavor.json`)
 
 - `ffmpeg/` — `ffmpeg` and `ffprobe`
 - `whisper/` — `whisper-cli` (and any dylibs / Metal shaders)
 - `llama/` — `llama-server` from llama.cpp
-- `models/` — `ggml-small-q5_1.bin`, `ggml-medium-q5_0.bin`, `qwen2.5-3b-instruct-q4_k_m.gguf`
+- `models/` — `ggml-small-q5_1.bin`, `ggml-medium-q5_0.bin`, `ggml-large-v3-q5_0.bin`, `qwen2.5-3b-instruct-q4_k_m.gguf`
 
 At runtime the app looks in:
 

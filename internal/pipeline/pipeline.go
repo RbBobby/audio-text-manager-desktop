@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexandr/audio-text-manager-desktop/internal/asr"
 	"github.com/alexandr/audio-text-manager-desktop/internal/config"
+	"github.com/alexandr/audio-text-manager-desktop/internal/flavor"
 	"github.com/alexandr/audio-text-manager-desktop/internal/jobs"
 	"github.com/alexandr/audio-text-manager-desktop/internal/llm"
 	"github.com/alexandr/audio-text-manager-desktop/internal/sidecar"
@@ -152,7 +153,7 @@ func (w *Worker) runJob(id string) {
 			return
 		}
 		t0 := time.Now()
-		res, err := asr.Transcribe(ctx, sidecar.Whisper(cfg.WhisperBin), modelPath, j.AudioPath, j.ASRLanguage)
+		res, err := asr.Transcribe(ctx, sidecar.Whisper(cfg.WhisperBin), modelPath, j.AudioPath, j.ASRLanguage, flavor.Diarize(j.ASRPreset))
 		if errors.Is(err, context.Canceled) {
 			return
 		}

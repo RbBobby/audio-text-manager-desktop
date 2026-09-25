@@ -135,6 +135,10 @@ func Llama(explicit string) string {
 	return lookupPath(explicit, "ATM_LLAMA_BIN", names...)
 }
 
+func FlavorFile() string {
+	return lookupFile("flavor.json")
+}
+
 func FindModel(explicit, envName, defaultName string) string {
 	names := []string{}
 	if defaultName != "" {

@@ -2,6 +2,7 @@
   "use strict";
 
   const ALLOWED = [".wav", ".mp3", ".m4a", ".flac", ".ogg", ".mp4"];
+  let asrDefault = "medium";
 
   const dropzone = document.getElementById("dropzone");
   const fileNameEl = document.getElementById("file-name");
@@ -23,6 +24,8 @@
   const metaLine = document.getElementById("meta-line");
   const outTranscript = document.getElementById("out-transcript");
   const outSummary = document.getElementById("out-summary");
+  const speakerFilter = document.getElementById("speaker-filter");
+  const speakerFilterWrap = document.getElementById("speaker-filter-wrap");
   const btnCopyTranscript = document.getElementById("btn-copy-transcript");
   const btnCopySummary = document.getElementById("btn-copy-summary");
   const btnDlTranscriptTxt = document.getElementById("btn-dl-transcript-txt");
@@ -86,6 +89,7 @@
   let pollTimer = null;
   let currentJobId = null;
   let transcriptFetchedForJob = null;
+  let fullTranscript = "";
   let requeueTargetJobId = null;
   let summarizeOnlyTargetJobId = null;
   let activeHistoryId = null;
@@ -323,7 +327,7 @@
     try {
       const tj = await goCall("GetTranscript", [currentJobId]);
       transcriptFetchedForJob = currentJobId;
-      outTranscript.textContent = tj.transcript || "";
+      setTranscriptText(tj.transcript || "");
       outSummary.textContent = "Ожидание саммари…";
       resultsSection.hidden = false;
       refreshSummarizeOnlyBtn();
@@ -336,10 +340,61 @@
     }
   }
 
+  function speakerIds(text) {
+    const ids = [];
+    const re = /^Спикер\s+(\d+):/gm;
+    let m;
+    while ((m = re.exec(text || ""))) {
+      if (ids.indexOf(m[1]) < 0) ids.push(m[1]);
+    }
+    return ids.sort(function (a, b) {
+      return Number(a) - Number(b);
+    });
+  }
+
+  function setTranscriptText(text) {
+    fullTranscript = text || "";
+    const ids = speakerIds(fullTranscript);
+    if (speakerFilterWrap) {
+      speakerFilterWrap.hidden = ids.length < 2;
+    }
+    if (speakerFilter) {
+      const prev = speakerFilter.value;
+      speakerFilter.innerHTML = "";
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = "Все";
+      speakerFilter.appendChild(all);
+      ids.forEach(function (id) {
+        const o = document.createElement("option");
+        o.value = id;
+        o.textContent = "Спикер " + id;
+        speakerFilter.appendChild(o);
+      });
+      if (prev && ids.indexOf(prev) >= 0) speakerFilter.value = prev;
+    }
+    renderTranscriptView();
+  }
+
+  function renderTranscriptView() {
+    const src = fullTranscript || "";
+    const want = speakerFilter && speakerFilter.value;
+    if (!want) {
+      outTranscript.textContent = src;
+      return;
+    }
+    const blocks = src.split(/\n\n+/);
+    const keep = [];
+    for (let i = 0; i < blocks.length; i++) {
+      if (blocks[i].indexOf("Спикер " + want + ":") === 0) keep.push(blocks[i]);
+    }
+    outTranscript.textContent = keep.join("\n\n");
+  }
+
   function showSavedTranscript(job, summaryPlaceholder) {
     const t = job && job.transcript ? String(job.transcript) : "";
     if (!t.trim()) return false;
-    outTranscript.textContent = t;
+    setTranscriptText(t);
     if (summaryPlaceholder != null) {
       outSummary.textContent = summaryPlaceholder;
     }
@@ -350,7 +405,7 @@
   function refreshSummarizeOnlyBtn() {
     const hasTranscript = !!(
       currentJobId &&
-      (outTranscript.textContent || "").trim().length > 0
+      (fullTranscript || outTranscript.textContent || "").trim().length > 0
     );
     const canRetry =
       lastKnownJobStatus === "done" || lastKnownJobStatus === "error";
@@ -453,7 +508,7 @@
   async function loadResult() {
     try {
       const res = await goCall("GetResult", [currentJobId]);
-      outTranscript.textContent = res.transcript || "";
+      setTranscriptText(res.transcript || "");
       outSummary.textContent = res.summary || "";
       const t = res.timings || {};
       const m = res.model_info || {};
@@ -524,7 +579,7 @@
     hideError();
     progressSection.hidden = true;
     resultsSection.hidden = true;
-    outTranscript.textContent = "";
+    setTranscriptText("");
     outSummary.textContent = "";
     metaLine.textContent = "";
     btnReset.hidden = true;
@@ -836,7 +891,7 @@
     if (!currentJobId) return;
     requeueTargetJobId = currentJobId;
     requeueHint.textContent = "Задача " + currentJobId;
-    setSelectValue(requeueAsr, asrModel.value, "medium");
+    setSelectValue(requeueAsr, asrModel.value, asrDefault);
     setSelectValue(requeueLang, asrLang.value, "ru");
     setSelectValue(requeueSummary, summarySize.value, "executive");
     requeueCustom.value = customPrompt.value || "";
@@ -939,7 +994,7 @@
     stopProgressCreep();
     btnSubmit.disabled = true;
     resultsSection.hidden = true;
-    outTranscript.textContent = "";
+    setTranscriptText("");
     outSummary.textContent = "";
     progressSection.hidden = false;
     btnReset.hidden = false;
@@ -1164,8 +1219,12 @@
     copyText(outSummary.textContent, btnCopySummary);
   });
 
+  if (speakerFilter) {
+    speakerFilter.addEventListener("change", renderTranscriptView);
+  }
+
   btnDlTranscriptTxt.addEventListener("click", function () {
-    const t = outTranscript.textContent || "";
+    const t = fullTranscript || outTranscript.textContent || "";
     if (!t.trim()) {
       showError("Нет транскрипта для сохранения");
       return;
@@ -1173,7 +1232,7 @@
     saveExport(t, exportBasename("transcript"), "txt");
   });
   btnDlTranscriptDoc.addEventListener("click", function () {
-    const t = outTranscript.textContent || "";
+    const t = fullTranscript || outTranscript.textContent || "";
     if (!t.trim()) {
       showError("Нет транскрипта для сохранения");
       return;
@@ -1279,8 +1338,32 @@
   if (settingsPing) settingsPing.addEventListener("click", pingOllama);
   if (settingsSave) settingsSave.addEventListener("click", saveSettings);
 
+  function fillASRSelect(el, cfg) {
+    if (!el || !cfg || !cfg.presets) return;
+    el.innerHTML = "";
+    cfg.presets.forEach(function (p) {
+      const o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = p.label;
+      el.appendChild(o);
+    });
+    setSelectValue(el, cfg.default, asrDefault);
+  }
+
+  async function applyASRConfig() {
+    try {
+      const cfg = await goCall("GetASRConfig", []);
+      if (cfg && cfg.default) asrDefault = cfg.default;
+      fillASRSelect(asrModel, cfg);
+      fillASRSelect(requeueAsr, cfg);
+    } catch {
+      /* keep HTML fallback */
+    }
+  }
+
   asrLang.addEventListener("change", persistLang);
   restoreLang();
+  applyASRConfig();
 
   bindNativeDrop();
   refreshHistory();

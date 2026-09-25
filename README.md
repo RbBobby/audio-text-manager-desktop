@@ -2,6 +2,13 @@
 
 Десктопное приложение для **macOS** и **Windows**: локальная транскрибация через **whisper.cpp** и саммари через **llama.cpp**. Отдельный репозиторий от веб-сервиса Audio Text Manager.
 
+```bash
+git clone https://github.com/alexandr/audio-text-manager-desktop.git
+cd audio-text-manager-desktop
+```
+
+В git **нет** готового `.app` / `.exe` и весов моделей (~4 ГБ). Их качает `make fetch-runtime` или скрипт сборки. Как собрать два комплекта (`medium` и `speakers`) — [BUILD.md](BUILD.md).
+
 Стек — [Wails v2](https://wails.io): нативное окно (WebView) и бэкенд на Go. Python, Ollama и Homebrew на машине пользователя **не нужны**, если собрать `make dist`. HTTP API на `:8000`, Kubernetes и Make-сервер из веб-версии не входят.
 
 Версия продукта: `0.1.0` (`wails.json`).
@@ -20,9 +27,11 @@
   | --- | --- | --- | --- |
   | Очень быстро (small Q5) | `fast` | `ggml-small-q5_1.bin` | ~181 МБ |
   | Средне (medium Q5) | `medium` | `ggml-medium-q5_0.bin` | ~514 МБ |
+  | Точно (large-v3 Q5) | `large` | `ggml-large-v3-q5_0.bin` | ~1.0 ГБ |
 
 - Пресеты саммари: `gist` (о чём речь), `executive` (резюме для руководства), `meeting` (полный доклад). Либо свой промпт — тогда пресет игнорируется, один запрос к встроенному llama-server.
 - История задач, стадии `upload / asr / summarize`, транскрипт доступен до конца саммари.
+- В комплекте `speakers` (large-v3): разбиение реплик (`Спикер 1` / `Спикер 2`) и фильтр в блоке транскрипта.
 - Стоп текущей, стоп всех, удаление выбранных (аудио и результаты с диска без восстановления).
 - Перезапуск полного пайплайна с другими параметрами.
 - **Только саммари** по уже сохранённому тексту — Whisper повторно не запускается.
@@ -48,19 +57,24 @@
 | --- | --- | --- |
 | ASR fast | `ggml-small-q5_1.bin` | 181 МБ |
 | ASR medium | `ggml-medium-q5_0.bin` | 514 МБ |
+| ASR large | `ggml-large-v3-q5_0.bin` | 1.0 ГБ |
 | Саммари | `qwen2.5-3b-instruct-q4_k_m.gguf` | 2.0 ГБ |
 
 Итоговый `.app` ≈ **2.9 ГБ**. Системный WebView (WKWebView / WebView2) остаётся от ОС.
 
-Сборка коробки (на машине разработчика нужны Go, Wails, cmake, git, интернет):
+Два комплекта (на Mac и на Windows — оба):
+
+| Комплект | Whisper | Спикеры | Скрипт |
+| --- | --- | --- | --- |
+| `medium` | small + medium | нет | `./build_macos.sh medium` / `./build_windows.sh medium` |
+| `speakers` | small + large-v3 | да | `./build_macos.sh speakers` / `./build_windows.sh speakers` |
+
+Без аргумента скрипт собирает **оба**. Windows — только на ПК с Windows (Git Bash). Подробности: [BUILD.md](BUILD.md).
 
 ```bash
 ./build_macos.sh
-open dist/AudioTextManager.app
+open dist/speakers/AudioTextManager.app
 ```
-
-Готовый бандл и zip — в `dist/`. Подробности: [BUILD.md](BUILD.md).  
-`make dist` = sidecar + `wails build` + упаковка в `build/bin/`. `./build_macos.sh` делает то же и копирует очищенный `.app` + zip в `dist/`.
 
 Если модели не упаковали, приложение при первой задаче скачает недостающие веса в `~/Library/Application Support/AudioTextManager/models/`. Бинарники без бандла оно само не установит.
 
@@ -82,11 +96,12 @@ LLM: Qwen2.5 3B Instruct Q4 — лёгкая модель, нормально т
 ## Быстрый старт (уже собранное `make dist`)
 
 ```bash
-# macOS, из корня репозитория
-open build/bin/AudioTextManager.app
+# macOS
+open dist/speakers/AudioTextManager.app
+# или: open dist/medium/AudioTextManager.app
 ```
 
-Windows: запустите `build/bin/AudioTextManager.exe`.
+Windows: `dist\speakers\AudioTextManager\AudioTextManager.exe` (или комплект `medium`).
 
 Первый запуск:
 
@@ -123,20 +138,19 @@ export PATH="$HOME/go/bin:$PATH"
 Кросс-компиляция WebView **не поддерживается** — собирайте на целевой ОС.
 
 ```bash
-make test          # go test ./internal/...
-make dist          # самодостаточный .app (~2.9 ГБ)
-# или по шагам:
-make fetch-runtime
-make build
-make package
+make test
+./build_macos.sh              # dist/medium + dist/speakers
+./build_windows.sh            # то же, только на Windows
+# один комплект в build/bin:
+FLAVOR=speakers make dist
 ```
 
-Артефакты:
+Артефакты для раздачи:
 
-| ОС | Путь |
-| --- | --- |
-| macOS | `build/bin/AudioTextManager.app` |
-| Windows | `build/bin/AudioTextManager.exe` + каталоги `sidecar/` и `models/` рядом |
+| ОС | Комплект | Путь |
+| --- | --- | --- |
+| macOS | medium / speakers | `dist/<flavor>/AudioTextManager.zip` |
+| Windows | medium / speakers | `dist/<flavor>/AudioTextManager-windows.zip` |
 
 Подпись и нотаризация Apple — отдельный шаг, не блокер прототипа. NSIS-инсталлятор Windows можно добавить позже (`wails build -nsis`).
 
@@ -156,11 +170,12 @@ make package
 
 ```
 файл → ffmpeg (WAV 16 kHz mono)
-     → whisper-cli -m ggml-*.bin -f ….wav -nt -otxt
+     → whisper-cli -m ggml-*.bin -f ….wav -l LANG -oj
+     → сегменты JSON + кластеризация спикеров
      → llama-server /v1/chat/completions (пресет или свой промпт)
 ```
 
-Транскрипт для LLM обрезается примерно до **120 000 рун**. Параметры: `temperature=0.2`, контекст 8192, `max_tokens=2048`, таймаут чата 15 минут. `llama-server` поднимается лениво при первом саммари и живёт до закрытия окна.
+Транскрипт для LLM обрезается примерно до **28 000 рун**. Параметры: `temperature=0.2`, контекст llama-server `16384`, `max_tokens=2048`, таймаут чата 15 минут. `llama-server` поднимается лениво при первом саммари и живёт до закрытия окна.
 
 Пресеты саммари отвечают **на языке транскрипта**. Если заполнен свой промпт, системная инструкция пресета не используется.
 
@@ -224,6 +239,7 @@ UI живёт в готовом `frontend/dist` (порт веб-ATM). Отде�
 | `BulkDelete` | Удаление выбранных |
 | `Requeue` | Полный перезапуск |
 | `SummarizeOnly` | Только LLM по сохранённому транскрипту |
+| `GetASRConfig` | Какие пресеты Whisper в этой сборке |
 | `GetSettings` / `SaveSettings` | Настройки |
 | `PingRuntime` | Проверка ffmpeg / whisper / llama-server |
 | `DataDir` | Каталог данных |
@@ -240,6 +256,7 @@ internal/llm       llama-server + GGUF
 internal/summary   chat completions
 internal/sidecar   поиск бинарников и моделей
 internal/pipeline  воркер очереди
+internal/flavor    комплект сборки (medium / speakers)
 internal/download  скачивание файлов
 ```
 
@@ -279,4 +296,6 @@ CLI установлен через `go install`, но `~/go/bin` не в `PATH`
 
 ## Лицензия и соседние репозитории
 
-Это десктопный клиент, не замена веб-ATM. Веса Whisper — по условиям моделей на Hugging Face; Qwen2.5 — Apache-2.0. ffmpeg — LGPL/GPL в зависимости от сборки.
+Код приложения — [MIT](LICENSE). Это десктопный клиент, не замена веб-ATM.
+
+Скачиваемые веса и sidecar под своими лицензиями: Whisper ggml — условия моделей на Hugging Face; Qwen2.5 Instruct GGUF — Apache-2.0; ffmpeg — LGPL/GPL в зависимости от сборки; whisper.cpp / llama.cpp — MIT.

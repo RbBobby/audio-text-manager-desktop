@@ -12,6 +12,7 @@ import (
 	"github.com/alexandr/audio-text-manager-desktop/internal/appdir"
 	"github.com/alexandr/audio-text-manager-desktop/internal/asr"
 	"github.com/alexandr/audio-text-manager-desktop/internal/config"
+	"github.com/alexandr/audio-text-manager-desktop/internal/flavor"
 	"github.com/alexandr/audio-text-manager-desktop/internal/jobs"
 	"github.com/alexandr/audio-text-manager-desktop/internal/llm"
 	"github.com/alexandr/audio-text-manager-desktop/internal/media"
@@ -285,6 +286,9 @@ func (a *App) CreateJob(path, asrPreset, summarySize, customPrompt, language str
 	if _, err := asr.ModelFile(asrPreset); err != nil {
 		return nil, err
 	}
+	if !flavor.Allows(asrPreset) {
+		return nil, fmt.Errorf("asr preset %q is not in this build", asrPreset)
+	}
 	lang, err := asr.NormalizeLanguage(language)
 	if err != nil {
 		return nil, err
@@ -455,6 +459,9 @@ func (a *App) Requeue(id, asrPreset, summarySize, customPrompt, language string)
 	if _, err := asr.ModelFile(asrPreset); err != nil {
 		return nil, err
 	}
+	if !flavor.Allows(asrPreset) {
+		return nil, fmt.Errorf("asr preset %q is not in this build", asrPreset)
+	}
 	lang, err := asr.NormalizeLanguage(language)
 	if err != nil {
 		return nil, err
@@ -481,6 +488,10 @@ func (a *App) SummarizeOnly(id, summarySize, customPrompt string) (*CreateJobRes
 		return nil, err
 	}
 	return &CreateJobResult{JobID: id}, nil
+}
+
+func (a *App) GetASRConfig() flavor.Config {
+	return flavor.UI()
 }
 
 func (a *App) GetSettings() (*SettingsDTO, error) {

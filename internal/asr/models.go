@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 
 	"github.com/alexandr/audio-text-manager-desktop/internal/download"
+	"github.com/alexandr/audio-text-manager-desktop/internal/flavor"
 	"github.com/alexandr/audio-text-manager-desktop/internal/sidecar"
 )
 
 var modelURLs = map[string]string{
-	"ggml-small-q5_1.bin":  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
-	"ggml-medium-q5_0.bin": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin",
+	"ggml-small-q5_1.bin":    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
+	"ggml-medium-q5_0.bin":   "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin",
+	"ggml-large-v3-q5_0.bin": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin",
 }
 
 // EnsureModel returns ggml weights from the app bundle, then the user cache, else downloads.
@@ -19,6 +21,9 @@ func EnsureModel(ctx context.Context, modelsDir, preset string) (string, error) 
 	name, err := ModelFile(preset)
 	if err != nil {
 		return "", err
+	}
+	if !flavor.Allows(preset) {
+		return "", fmt.Errorf("asr preset %q is not in this build (%s)", preset, flavor.Current().ID)
 	}
 	if p := sidecar.FindModel("", "", name); p != "" {
 		return p, nil

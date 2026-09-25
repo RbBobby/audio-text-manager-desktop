@@ -97,7 +97,8 @@
                   <span class="field__label">Модель транскрибации</span>
                   <select id="asr-model" class="select">
                     <option value="fast">Очень быстро (small Q5)</option>
-                    <option value="medium" selected>Средне (medium Q5)</option>
+                    <option value="medium">Средне (medium Q5)</option>
+                    <option value="large" selected>Точно (large-v3 Q5, спикеры)</option>
                   </select>
                 </label>
                 <label class="field">
@@ -224,6 +225,10 @@
                 <article class="result">
                   <div class="result__head">
                     <h3 class="result__title">Транскрипт</h3>
+                    <label class="speaker-filter" id="speaker-filter-wrap" hidden>
+                      <span class="speaker-filter__label">Спикер</span>
+                      <select id="speaker-filter" class="select select--compact"></select>
+                    </label>
                     <div class="result__actions">
                       <button id="btn-copy-transcript" type="button" class="btn btn--small">
                         Копировать
@@ -292,6 +297,7 @@
             <select id="requeue-asr" class="select">
               <option value="fast">Очень быстро (small Q5)</option>
               <option value="medium">Средне (medium Q5)</option>
+              <option value="large" selected>Точно (large-v3 Q5, спикеры)</option>
             </select>
           </label>
           <label class="field">

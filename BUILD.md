@@ -1,83 +1,114 @@
-# Сборка Audio Text Manager для macOS
+# Сборка Audio Text Manager
 
-Готовый бандл — одно окно `.app`: UI внутри, рядом в `Contents/Resources` лежат ffmpeg, whisper-cli, llama-server и веса. На машине пользователя не нужны Python, Node, Ollama, Homebrew и исходники.
+Два комплекта (на каждой ОС — оба):
 
-Стек сборки: **Go + Wails v2** (не PyInstaller / py2app).
+| Комплект | Модели Whisper | Спикеры | Каталог |
+| --- | --- | --- | --- |
+| `medium` | small + medium | нет | `dist/medium/` |
+| `speakers` | small + large-v3 | да, на large-v3 | `dist/speakers/` |
 
-## Что нужно на машине разработчика
+В обоих есть Qwen для саммари. Кросс-компиляция WebView **не работает**: macOS собирайте на Mac, Windows — на Windows.
 
-- macOS той же архитектуры, на которую собираете (Apple Silicon → `arm64`, Intel → `x86_64`)
-- [Go](https://go.dev/dl/) (версия как в `go.mod`)
-- [Wails v2 CLI](https://wails.io/docs/gettingstarted/installation): `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
-- `export PATH="$HOME/go/bin:$PATH"`
-- cmake и git — один раз, чтобы собрать `whisper-cli` (`make fetch-runtime`)
-- интернет при первой загрузке sidecar и моделей
+## Комплект medium
 
-## Сборка
+В меню: «Очень быстро (small)» и «Средне (medium)». Транскрипт сплошным текстом, без «Спикер N».
+
+## Комплект speakers
+
+В меню: small и «Точно (large-v3 Q5, спикеры)». На large-v3 реплики помечаются как Спикер 1 / Спикер 2. Small в этой сборке без разметки голосов.
+
+---
+
+## macOS
+
+Нужны Go (версия из `go.mod`), [Wails v2](https://wails.io/docs/gettingstarted/installation), cmake, git, интернет.
 
 ```bash
 cd /path/to/audio-text-manager-desktop
-./build_macos.sh
+export PATH="$HOME/go/bin:$PATH"
+./build_macos.sh          # оба комплекта
+# или один:
+./build_macos.sh medium
+./build_macos.sh speakers
 ```
 
-Скрипт вызывает `make dist` (sidecar + `wails build` + упаковка), чистит AppleDouble, разворачивает симлинки llama, подписывает ad-hoc и кладёт результат в `dist/`.
+Результат:
 
-Эквивалент вручную: `export PATH="$HOME/go/bin:$PATH" && make dist`.
+- `dist/medium/AudioTextManager.app` и `.zip`
+- `dist/speakers/AudioTextManager.app` и `.zip`
 
-## Куда кладётся результат
+Отдавайте **zip**. Подробности про Gatekeeper — как раньше: ПКМ → Открыть.
 
-| Файл | Назначение |
-| --- | --- |
-| `dist/AudioTextManager.app` | Приложение |
-| `dist/AudioTextManager.zip` | То же, для передачи (симлинки и права сохранены, без `._*`) |
+---
 
-Копия Wails остаётся в `build/bin/AudioTextManager.app`. Для раздачи берите **`dist/`**.
+## Windows (на ПК с Windows x64)
 
-Проверка у себя:
+Не запускайте `build_windows.sh` с Mac.
+
+### Один раз поставить
+
+1. [Git for Windows](https://git-scm.com/download/win) — дальше все команды в **Git Bash**.
+2. [Go](https://go.dev/dl/) (как в `go.mod`).
+3. Wails:
+   ```bash
+   go install github.com/wailsapp/wails/v2/cmd/wails@latest
+   ```
+   Добавьте в PATH: `C:\Users\<вы>\go\bin` (Параметры → Переменные среды).
+4. Компилятор для CGO, который просит Wails: `wails doctor` и поставьте то, что он напишет (часто MinGW / TDM-GCC).
+5. [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) — на Windows 11 обычно уже есть.
+6. Интернет на первую загрузку sidecar и моделей (~4 ГБ в кэше `third_party/`, в каждый zip пойдёт только свой набор Whisper).
+
+Проверка:
 
 ```bash
-open dist/AudioTextManager.app
-lipo -archs dist/AudioTextManager.app/Contents/MacOS/AudioTextManager
-codesign --verify --deep --strict dist/AudioTextManager.app
+go version
+wails version
+wails doctor
 ```
 
-## Как передать на другой Mac
+### Сборка
 
-1. Отправляйте **`AudioTextManager.zip`**, не папку `.app` в облако «как файлы».
-2. Лучше флешка или AirDrop, чем веб-диск (меньше карантина).
-3. На том Mac: распаковать **двойным кликом** или  
-   `ditto -x -k --norsrc AudioTextManager.zip ~/Desktop`
-4. Перетащить `.app` в `/Applications` или оставить на Рабочем столе.
-5. Сборка **arm64** не запустится на Intel и наоборот. Для Intel соберите скрипт на Intel-Mac. Universal (оба чипа в одном `.app`) сейчас не собирается.
-
-Данные задач пишутся в `~/Library/Application Support/AudioTextManager/`, не в папку проекта.
-
-## Если macOS блокирует запуск
-
-Сертификат Developer ID и нотаризация **не обязательны** для передачи своим. Ad-hoc подпись после скачивания из интернета часто даёт «неизвестный разработчик» или «повреждена».
-
-**Сначала:** не в Корзину. ПКМ по `.app` → **Открыть** → снова **Открыть**.
-
-Если пишет «повреждена» — карантин или мусор `._*` после облака. На **том** Mac:
-
-```bash
-APP="$HOME/Desktop/AudioTextManager.app"
-find "$APP" -name '._*' -delete
-xattr -cr "$APP"
-codesign --force --deep --sign - "$APP"
-open "$APP"
-```
-
-`xattr` из `~/Downloads` иногда не снимается (защита папки). Перетащите приложение на Рабочий стол и повторите.
-
-Двойной клик «как из App Store» без этих шагов возможен только после нотаризации Apple (платный Developer Program). На этом этапе это не требуется.
-
-## Разработка без упаковки
+В Git Bash, из корня репозитория:
 
 ```bash
 export PATH="$HOME/go/bin:$PATH"
-make fetch-runtime
-wails dev
+./build_windows.sh          # оба комплекта
+# или:
+./build_windows.sh medium
+./build_windows.sh speakers
 ```
 
-Sidecar ищется в `third_party/`.
+Скрипт сам качает ffmpeg, whisper-cli, llama-server и модели, затем `wails build` и пакует два набора.
+
+Результат:
+
+```
+dist/medium/AudioTextManager/          ← папка: exe + sidecar + models
+dist/medium/AudioTextManager-windows.zip
+dist/speakers/AudioTextManager/
+dist/speakers/AudioTextManager-windows.zip
+```
+
+Пользователю отдайте **zip** или всю папку `AudioTextManager`. Запуск: `AudioTextManager.exe`. Рядом обязательно должны остаться `sidecar\` и `models\`.
+
+Данные задач: `%AppData%\AudioTextManager\`.
+
+### Если `wails` не находится
+
+```bash
+export PATH="$HOME/go/bin:$PATH"
+```
+
+или в cmd: `set PATH=%USERPROFILE%\go\bin;%PATH%`
+
+### Если нет ffmpeg
+
+`scripts/fetch-runtime.sh` качает essentials с gyan.dev. Если зеркало упало — вручную положите `ffmpeg.exe` и `ffprobe.exe` в `third_party/ffmpeg/` и снова `./build_windows.sh`.
+
+---
+
+## Что не коммитится
+
+Веса и бинарники живут в `third_party/` на машине сборки. В git их нет.
+
+Разработка без комплекта: `make fetch-runtime && wails dev` — в UI будут все модели, которые лежат в `third_party/models`.

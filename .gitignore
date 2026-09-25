@@ -1,20 +1,18 @@
 # Production / local builds — do not commit
 /dist/
 /build/bin/
+build/windows/
+build/darwin/*.app
 *.app
-*.app/
-AudioTextManager.zip
-build/bin/AudioTextManager.zip
+*.zip
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+*.gguf
+*.bin
 atm-desktop
-
-# Wails compile leftovers
-build/darwin/*.app
-build/windows/
 
 # Go
 vendor/
@@ -28,6 +26,7 @@ frontend/wailsjs/
 
 # OS / IDE
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
 .cursor/
@@ -36,10 +35,12 @@ frontend/wailsjs/
 # Accidental dumps
 /дщ
 
-# Sidecar + models (make fetch-runtime / make dist)
+# Sidecar + models (make fetch-runtime / ./build_macos.sh / ./build_windows.sh)
 /models/
 third_party/ffmpeg/
 third_party/whisper/
 third_party/llama/
 third_party/models/
 third_party/src/
+third_party/**/*.exe
+third_party/**/*.dll

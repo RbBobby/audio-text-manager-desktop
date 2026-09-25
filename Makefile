@@ -1,4 +1,6 @@
-.PHONY: test tidy dev build fetch-runtime package dist macos-app
+.PHONY: test tidy dev build fetch-runtime package dist macos-app windows-app
+
+FLAVOR ?= medium
 
 test:
 	go test ./internal/...
@@ -16,10 +18,13 @@ fetch-runtime:
 	bash scripts/fetch-runtime.sh
 
 package:
-	bash scripts/package-sidecar.sh
+	FLAVOR=$(FLAVOR) bash scripts/package-sidecar.sh
 
-# Self-contained app: ffmpeg + whisper.cpp + llama.cpp + models inside the bundle.
+# One flavor into build/bin/. For both zips use ./build_macos.sh or ./build_windows.sh
 dist: fetch-runtime build package
 
 macos-app:
 	bash ./build_macos.sh
+
+windows-app:
+	bash ./build_windows.sh

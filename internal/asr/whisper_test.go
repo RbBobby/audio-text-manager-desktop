@@ -21,6 +21,10 @@ func TestModelFile(t *testing.T) {
 	if _, err := asr.ModelFile("turbo"); err == nil {
 		t.Fatal("expected error")
 	}
+	name, err = asr.ModelFile("large")
+	if err != nil || name != "ggml-large-v3-q5_0.bin" {
+		t.Fatalf("large %s %v", name, err)
+	}
 }
 
 func TestNormalizeLanguage(t *testing.T) {

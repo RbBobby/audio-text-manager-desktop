@@ -7,6 +7,35 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TP="$ROOT/third_party"
 APP="$ROOT/build/bin/AudioTextManager.app"
 WIN="$ROOT/build/bin/AudioTextManager.exe"
+FLAVOR="${FLAVOR:-}"
+
+if [[ "$FLAVOR" != "medium" && "$FLAVOR" != "speakers" ]]; then
+  echo "Set FLAVOR=medium (small+medium) or FLAVOR=speakers (small+large-v3 + diarize)" >&2
+  exit 1
+fi
+
+if [[ "$FLAVOR" == "speakers" ]]; then
+  ASR_MODELS=(ggml-small-q5_1.bin ggml-large-v3-q5_0.bin)
+  FLAVOR_JSON='{"id":"speakers","speakers":true,"presets":["fast","large"]}'
+else
+  ASR_MODELS=(ggml-small-q5_1.bin ggml-medium-q5_0.bin)
+  FLAVOR_JSON='{"id":"medium","speakers":false,"presets":["fast","medium"]}'
+fi
+
+copy_flavor_models() {
+  local dest="$1"
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  local f
+  for f in "${ASR_MODELS[@]}" qwen2.5-3b-instruct-q4_k_m.gguf; do
+    if [[ ! -s "$TP/models/$f" ]]; then
+      echo "missing model $TP/models/$f — run make fetch-runtime" >&2
+      exit 1
+    fi
+    cp "$TP/models/$f" "$dest/$f"
+  done
+  printf '%s\n' "$FLAVOR_JSON" > "$dest/flavor.json"
+}
 
 copy_tree() {
   local src="$1" dest="$2"
@@ -55,7 +84,7 @@ if [[ -d "$APP" ]]; then
   copy_tree_deref "$TP/ffmpeg" "$RES/sidecar/ffmpeg"
   copy_tree_deref "$TP/whisper" "$RES/sidecar/whisper"
   copy_tree_deref "$TP/llama" "$RES/sidecar/llama"
-  copy_tree_deref "$TP/models" "$RES/models"
+  copy_flavor_models "$RES/models"
   chmod -R u+w "$RES/sidecar" "$RES/models" || true
   find "$RES/sidecar" -type f \( \
     -name 'ffmpeg' -o -name 'ffprobe' -o -name 'whisper-cli' \
@@ -68,7 +97,7 @@ if [[ -d "$APP" ]]; then
   if command -v codesign >/dev/null 2>&1; then
     codesign --force --deep --sign - "$APP"
   fi
-  echo "Packaged into $APP"
+  echo "Packaged $FLAVOR into $APP"
   du -sh "$APP"
   exit 0
 fi
@@ -78,8 +107,8 @@ if [[ -f "$WIN" ]]; then
   copy_tree "$TP/ffmpeg" "$DIR/sidecar/ffmpeg"
   copy_tree "$TP/whisper" "$DIR/sidecar/whisper"
   copy_tree "$TP/llama" "$DIR/sidecar/llama"
-  copy_tree "$TP/models" "$DIR/models"
-  echo "Packaged next to $WIN"
+  copy_flavor_models "$DIR/models"
+  echo "Packaged $FLAVOR next to $WIN"
   exit 0
 fi
 

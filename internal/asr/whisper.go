@@ -15,12 +15,13 @@ import (
 var Presets = map[string]string{
 	"fast":   "ggml-small-q5_1.bin",
 	"medium": "ggml-medium-q5_0.bin",
+	"large":  "ggml-large-v3-q5_0.bin",
 }
 
 func ModelFile(preset string) (string, error) {
 	name, ok := Presets[preset]
 	if !ok {
-		return "", fmt.Errorf("unknown asr preset %q (fast|medium)", preset)
+		return "", fmt.Errorf("unknown asr preset %q (fast|medium|large)", preset)
 	}
 	return name, nil
 }
@@ -48,7 +49,7 @@ type Result struct {
 }
 
 // Transcribe runs whisper.cpp CLI against an already-resolved ggml model path.
-func Transcribe(ctx context.Context, bin, modelPath, wavPath, language string) (*Result, error) {
+func Transcribe(ctx context.Context, bin, modelPath, wavPath, language string, diarize bool) (*Result, error) {
 	cli, err := resolveBin(bin)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func Transcribe(ctx context.Context, bin, modelPath, wavPath, language string) (
 		"-m", modelPath,
 		"-f", wavPath,
 		"-l", lang,
-		"-nt",
+		"-oj",
 		"-otxt",
 		"-of", outBase,
 	)
@@ -75,11 +76,26 @@ func Transcribe(ctx context.Context, bin, modelPath, wavPath, language string) (
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("whisper.cpp failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
+	text := ""
+	jsonPath := outBase + ".json"
+	if raw, err := os.ReadFile(jsonPath); err == nil {
+		segs := CollapseRepeats(ParseWhisperJSON(raw))
+		if len(segs) > 0 {
+			if diarize {
+				AssignSpeakers(wavPath, segs)
+			}
+			text = FormatSpeakers(segs)
+		}
+		_ = os.Remove(jsonPath)
+	}
 	txt := outBase + ".txt"
-	raw, err := os.ReadFile(txt)
-	if err != nil {
-		return nil, fmt.Errorf("whisper.cpp produced no transcript file: %w", err)
+	if text == "" {
+		raw, err := os.ReadFile(txt)
+		if err != nil {
+			return nil, fmt.Errorf("whisper.cpp produced no transcript file: %w", err)
+		}
+		text = strings.TrimSpace(string(raw))
 	}
 	_ = os.Remove(txt)
-	return &Result{Text: strings.TrimSpace(string(raw)), ModelFile: filepath.Base(modelPath)}, nil
+	return &Result{Text: text, ModelFile: filepath.Base(modelPath)}, nil
 }
