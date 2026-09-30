@@ -52,3 +52,14 @@ func TestPrepareUploadRejectsUnknown(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestHasAudioStreamReportsProbeFailures(t *testing.T) {
+	probe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasAudio, err := media.HasAudioStream(probe, filepath.Join(t.TempDir(), "video.mp4"))
+	if err == nil || hasAudio || !strings.Contains(err.Error(), "ffprobe failed") {
+		t.Fatalf("hasAudio=%v err=%v", hasAudio, err)
+	}
+}

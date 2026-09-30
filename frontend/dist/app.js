@@ -5,6 +5,10 @@
   let asrDefault = "medium";
 
   const dropzone = document.getElementById("dropzone");
+  const windowbar = document.getElementById("windowbar");
+  const btnWindowMinimise = document.getElementById("btn-window-minimise");
+  const btnWindowMaximise = document.getElementById("btn-window-maximise");
+  const btnWindowClose = document.getElementById("btn-window-close");
   const fileNameEl = document.getElementById("file-name");
   const asrModel = document.getElementById("asr-model");
   const asrLang = document.getElementById("asr-lang");
@@ -175,8 +179,28 @@
     formError.textContent = "";
   }
 
-  function setDropActive(on) {
-    dropzone.classList.toggle("dropzone--active", on);
+  function bindWindowControls() {
+    const runtime = window.runtime;
+    if (!runtime || !runtime.Environment || !windowbar) return;
+    runtime.Environment().then(function (environment) {
+      if (environment.platform === "windows") {
+        windowbar.hidden = false;
+        document.body.classList.add("windows");
+      }
+    }).catch(function () {});
+
+    btnWindowMinimise.addEventListener("click", function () {
+      runtime.WindowMinimise();
+    });
+    btnWindowMaximise.addEventListener("click", function () {
+      runtime.WindowToggleMaximise();
+    });
+    btnWindowClose.addEventListener("click", function () {
+      runtime.Quit();
+    });
+    windowbar.addEventListener("dblclick", function (e) {
+      if (!e.target.closest("button")) runtime.WindowToggleMaximise();
+    });
   }
 
   function stageClass(state) {
@@ -1151,30 +1175,6 @@
     }
   });
 
-  ["dragenter", "dragover"].forEach(function (ev) {
-    dropzone.addEventListener(ev, function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      setDropActive(true);
-    });
-  });
-
-  ["dragleave", "drop"].forEach(function (ev) {
-    dropzone.addEventListener(ev, function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      setDropActive(false);
-    });
-  });
-
-  dropzone.addEventListener("drop", function (e) {
-    const dt = e.dataTransfer;
-    if (!dt) return;
-    if (dt.files && dt.files[0] && dt.files[0].path) {
-      setPath(dt.files[0].path);
-    }
-  });
-
   btnSubmit.addEventListener("click", submitJob);
   btnReset.addEventListener("click", resetUi);
   btnStopCurrent.addEventListener("click", cancelCurrentJob);
@@ -1366,6 +1366,7 @@
   applyASRConfig();
 
   bindNativeDrop();
+  bindWindowControls();
   refreshHistory();
   setTimeout(refreshHistory, 500);
 })();
