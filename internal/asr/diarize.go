@@ -21,7 +21,7 @@ func AssignSpeakers(wavPath string, segs []Segment) {
 	}
 	pcm, err := readPCM16Mono16k(wavPath)
 	if err != nil || len(pcm) < minSegSamples {
-		pauseSpeakers(segs)
+		singleSpeaker(segs)
 		return
 	}
 	vecs := make([][]float64, len(segs))
@@ -50,16 +50,10 @@ func AssignSpeakers(wavPath string, segs []Segment) {
 	smoothSpeakers(segs)
 }
 
-func pauseSpeakers(segs []Segment) {
-	sp := 1
+// Without usable audio, pauses cannot establish a change of speaker.
+func singleSpeaker(segs []Segment) {
 	for i := range segs {
-		if i > 0 && segs[i].StartMS-segs[i-1].EndMS >= 800 {
-			sp++
-			if sp > 2 {
-				sp = 1
-			}
-		}
-		segs[i].Speaker = sp
+		segs[i].Speaker = 1
 	}
 }
 
@@ -189,6 +183,10 @@ func clusterEmbeddings(vecs [][]float64) []int {
 	}
 	for uniqueCount(id) > maxSpeakers {
 		if !mergeClosest(vecs, id) {
+			// Unusable distances must not leak one speaker ID per segment.
+			for i := range id {
+				id[i] = 1
+			}
 			break
 		}
 	}

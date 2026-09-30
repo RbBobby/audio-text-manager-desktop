@@ -2,6 +2,7 @@ package asr_test
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -100,6 +101,56 @@ func TestAssignSpeakersDifferentTones(t *testing.T) {
 	}
 	if segs[0].Speaker != segs[2].Speaker || segs[1].Speaker != segs[3].Speaker {
 		t.Fatalf("expected alternating pair, got %+v", segs)
+	}
+}
+
+func TestAssignSpeakersManyTurnsReuseTwoSpeakers(t *testing.T) {
+	wav := filepath.Join(t.TempDir(), "171-turns.wav")
+	parts := make([]toneSpan, 171)
+	segs := make([]asr.Segment, len(parts))
+	for i := range parts {
+		freq := 220.0
+		if i%2 == 1 {
+			freq = 2800
+		}
+		parts[i] = toneSpan{freq: freq, ms: 300}
+		segs[i] = asr.Segment{StartMS: i * 300, EndMS: (i + 1) * 300, Text: fmt.Sprintf("turn %d", i)}
+	}
+	if err := writeToneWAV(wav, parts); err != nil {
+		t.Fatal(err)
+	}
+	asr.AssignSpeakers(wav, segs)
+	if segs[0].Speaker == segs[1].Speaker {
+		t.Fatal("expected two distinct speakers")
+	}
+	for i, s := range segs {
+		if s.Speaker != segs[i%2].Speaker || s.Speaker < 1 || s.Speaker > 2 {
+			t.Fatalf("turn %d has unexpected speaker %d", i, s.Speaker)
+		}
+	}
+	if strings.Contains(asr.FormatSpeakers(segs), "Спикер 3:") {
+		t.Fatal("transcript introduces a third speaker")
+	}
+}
+
+func TestAssignSpeakersWithoutAudioDoesNotInventSpeakers(t *testing.T) {
+	for _, short := range []bool{false, true} {
+		wav := filepath.Join(t.TempDir(), "unusable.wav")
+		if short {
+			if err := writeToneWAV(wav, []toneSpan{{freq: 220, ms: 50}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		segs := make([]asr.Segment, 171)
+		for i := range segs {
+			segs[i] = asr.Segment{StartMS: i * 2000, EndMS: i*2000 + 500, Text: fmt.Sprintf("turn %d", i), Speaker: i + 1}
+		}
+		asr.AssignSpeakers(wav, segs)
+		for i, s := range segs {
+			if s.Speaker != 1 {
+				t.Fatalf("short=%t: turn %d invents speaker %d without usable audio", short, i, s.Speaker)
+			}
+		}
 	}
 }
 
