@@ -38,14 +38,23 @@ download() {
     return 0
   fi
   echo ">> $url"
-  curl -fL --retry 3 -A "audio-text-manager-desktop" -o "$dest.partial" "$url"
+  if ! curl -fL --retry 3 -A "audio-text-manager-desktop" -o "$dest.partial" "$url"; then
+    rm -f "$dest.partial"
+    echo "WARN: unable to download $url; network/DNS is unavailable. Skipping this runtime asset." >&2
+    return 1
+  fi
   mv "$dest.partial" "$dest"
 }
 
 github_asset() {
   local repo="$1" needle="$2"
-  curl -fsSL -A "audio-text-manager-desktop" "https://api.github.com/repos/${repo}/releases?per_page=12" |
-    python3 -c "
+  local python_bin=python3
+  if [[ "$OS" == "mingw"* || "$OS" == "msys"* || "$OS" == "cygwin"* || "$OS" == "windows"* ]] && \
+    { ! command -v "$python_bin" >/dev/null 2>&1 || ! "$python_bin" -c 'import json' >/dev/null 2>&1; }; then
+    python_bin=python
+  fi
+  if ! curl -fsSL -A "audio-text-manager-desktop" "https://api.github.com/repos/${repo}/releases?per_page=12" | \
+    "$python_bin" -c "
 import json,sys,re
 needle=sys.argv[1]
 releases=json.load(sys.stdin)
@@ -57,7 +66,10 @@ for rel in releases:
             print(url)
             sys.exit(0)
 sys.exit(1)
-" "$needle"
+" "$needle"; then
+    echo "WARN: unable to query GitHub releases for $repo; network/DNS is unavailable. Skipping this runtime asset." >&2
+    return 1
+  fi
 }
 
 fetch_ffmpeg() {
@@ -112,12 +124,18 @@ fetch_llama() {
     needle="bin-win-cpu-x64.zip"
   fi
   local url
-  url="$(github_asset "ggml-org/llama.cpp" "$needle")"
+  if ! url="$(github_asset "ggml-org/llama.cpp" "$needle")"; then
+    echo "WARN: llama runtime could not be downloaded; continuing without llama-server." >&2
+    return 0
+  fi
   local archive="$TP/src/llama-bin.tgz"
   if [[ "$url" == *.zip ]]; then
     archive="$TP/src/llama-bin.zip"
   fi
-  download "$url" "$archive"
+  if ! download "$url" "$archive"; then
+    echo "WARN: llama archive download failed; skipping llama runtime." >&2
+    return 0
+  fi
   rm -rf "$TP/src/llama-unpack"
   mkdir -p "$TP/src/llama-unpack"
   if [[ "$archive" == *.zip ]]; then
@@ -128,8 +146,8 @@ fetch_llama() {
   local server
   server="$(find "$TP/src/llama-unpack" -type f \( -name 'llama-server' -o -name 'llama-server.exe' \) | head -n1)"
   if [[ -z "$server" ]]; then
-    echo "llama-server not found in archive"
-    exit 1
+    echo "WARN: llama-server not found in archive; skipping llama runtime." >&2
+    return 0
   fi
   cp -R "$(dirname "$server")/." "$TP/llama/"
   chmod +x "$TP/llama/llama-server" 2>/dev/null || true
@@ -159,20 +177,36 @@ fetch_whisper() {
     return
   fi
   local url
-  url="$(github_asset "ggml-org/whisper.cpp" "whisper-bin-x64.zip")"
-  download "$url" "$TP/src/whisper-bin.zip"
+  if ! url="$(github_asset "ggml-org/whisper.cpp" "whisper-bin-x64.zip")"; then
+    echo "WARN: whisper runtime could not be downloaded; continuing without whisper-cli." >&2
+    return 0
+  fi
+  if ! download "$url" "$TP/src/whisper-bin.zip"; then
+    echo "WARN: whisper archive download failed; skipping whisper runtime." >&2
+    return 0
+  fi
   unzip -o "$TP/src/whisper-bin.zip" -d "$TP/src/whisper-unpack"
   local cli
   cli="$(find "$TP/src/whisper-unpack" -type f \( -name 'whisper-cli.exe' -o -name 'whisper-cli' -o -name 'main.exe' \) | head -n1)"
+  if [[ -z "$cli" ]]; then
+    echo "WARN: whisper-cli was not found in the archive; skipping whisper runtime." >&2
+    return 0
+  fi
   cp -R "$(dirname "$cli")/." "$TP/whisper/"
 }
 
 fetch_models() {
-  download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin" "$TP/models/ggml-small-q5_1.bin"
-  download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin" "$TP/models/ggml-medium-q5_0.bin"
-  download "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin" "$TP/models/ggml-large-v3-q5_0.bin"
-  download "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf" \
-    "$TP/models/qwen2.5-3b-instruct-q4_k_m.gguf"
+  for model_url in \
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin" \
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin" \
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-q5_0.bin" \
+    "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf"; do
+    local name
+    name="$(basename "$model_url")"
+    if ! download "$model_url" "$TP/models/$name"; then
+      echo "WARN: model $name could not be downloaded; network/DNS may be unavailable." >&2
+    fi
+  done
 }
 
 fetch_ffmpeg

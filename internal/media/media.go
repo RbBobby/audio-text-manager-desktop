@@ -50,11 +50,16 @@ func HasAudioStream(ffprobeBin, path string) (bool, error) {
 	cmd := exec.Command(bin, "-v", "error", "-select_streams", "a:0",
 		"-show_entries", "stream=codec_type", "-of", "csv=p=0", path)
 	sidecar.Prep(cmd)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return false, nil
+		if detail := strings.TrimSpace(stderr.String()); detail != "" {
+			return false, fmt.Errorf("ffprobe failed: %s", detail)
+		}
+		return false, fmt.Errorf("ffprobe failed: %w", err)
 	}
-	return strings.Contains(strings.ToLower(string(out)), "audio"), nil
+	return strings.TrimSpace(string(out)) != "", nil
 }
 
 func DurationSeconds(ffprobeBin, path string) (float64, error) {
@@ -155,7 +160,11 @@ func PrepareUpload(ffmpegBin, ffprobeBin, src, uploadsDir, jobID string, audioLi
 	}
 	if ext == ".mp4" {
 		ok, herr := HasAudioStream(ffprobeBin, tmp)
-		if herr == nil && !ok {
+		if herr != nil {
+			_ = os.Remove(tmp)
+			return "", origName, fmt.Errorf("could not inspect video audio tracks: %w", herr)
+		}
+		if !ok {
 			_ = os.Remove(tmp)
 			return "", origName, fmt.Errorf("no audio track in video; cannot transcribe")
 		}

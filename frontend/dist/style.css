@@ -63,6 +63,87 @@ code {
   padding: 1.5rem 1.25rem 3rem;
 }
 
+.windowbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+  height: 36px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.windowbar[hidden] {
+  display: none;
+}
+
+.windows .header__inner .title {
+  display: none;
+}
+
+.windowbar__drag {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.75rem;
+}
+
+.windowbar__mark {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.windowbar__title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.windowbar__controls {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.windowbar__control {
+  width: 46px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.windowbar__control:hover {
+  background: var(--surface-2);
+}
+
+.windowbar__control--close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.windowbar__control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .layout {
   display: flex;
   gap: 1.35rem;
@@ -386,7 +467,7 @@ code {
   background: var(--surface-2);
 }
 
-.dropzone--active {
+.dropzone.wails-drop-target-active {
   border-color: var(--accent);
   background: var(--surface-2);
 }

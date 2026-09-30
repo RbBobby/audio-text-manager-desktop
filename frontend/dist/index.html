@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <header id="windowbar" class="windowbar" hidden>
+      <div class="windowbar__drag" style="--wails-draggable: drag">
+        <span class="windowbar__mark" aria-hidden="true">A</span>
+        <span class="windowbar__title">Audio Text Manager</span>
+      </div>
+      <div class="windowbar__controls">
+        <button id="btn-window-minimise" type="button" class="windowbar__control" aria-label="Свернуть" title="Свернуть">&#x2212;</button>
+        <button id="btn-window-maximise" type="button" class="windowbar__control" aria-label="Развернуть или восстановить" title="Развернуть или восстановить">&#x25A1;</button>
+        <button id="btn-window-close" type="button" class="windowbar__control windowbar__control--close" aria-label="Закрыть" title="Закрыть">&#x00D7;</button>
+      </div>
+    </header>
     <div class="page">
       <header class="header">
         <div class="header__inner">
@@ -87,7 +98,7 @@
               >
                 <div class="dropzone__icon" aria-hidden="true">⬆</div>
                 <p class="dropzone__text">
-                  Перетащите аудио сюда или <span class="link">выберите файл</span>
+                  Перетащите аудио или видео сюда либо <span class="link">выберите файл</span>
                 </p>
                 <p id="file-name" class="dropzone__file muted"></p>
               </div>
